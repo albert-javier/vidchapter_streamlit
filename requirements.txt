@@ -1,5 +1,4 @@
 pandas
-json
-validators
 streamlit
-streamlit_player
+streamlit-player
+validators
