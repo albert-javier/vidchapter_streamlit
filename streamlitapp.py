@@ -1,5 +1,6 @@
 import pandas as pd
 import json
+import requests
 import validators
 import streamlit as st
 from streamlit import session_state as ss
@@ -37,10 +38,13 @@ if "video_url" not in ss:
 
 if "selected_chapter" not in ss:
     ss.selected_chapter = None
+    
+if "is_error" not in ss:
+    ss.is_error = 0
 
 # --- Input Section ---
 st.write("### YouTube Video URL Input")
-video_url = st.text_input("Paste a YouTube URL link here", value="https://www.youtube.com/watch?v=4lE5JSe9sVM")
+video_url = st.text_input("Paste a YouTube URL link here", value="https://www.youtube.com/watch?v=SCd5SDLamK0")
 
 # --- Function Definitions ---
 def render_table_headers(columns, extra_column="Action"):
@@ -58,6 +62,48 @@ def generate_chapters(video_url):
     print("youtube video id:",captured_value)
     
         
+    # # URL to send the request to
+    # url = "http://127.0.0.1:5000/vidchap/chaptering"
+
+    # # Headers to indicate JSON content
+    # headers = {
+    #     "Content-Type": "application/json",
+    #     # "Authorization": "Bearer your_api_token"  # Optional, for authenticated APIs
+    # }
+
+    # # JSON body to send
+    # jdata = {
+    #     "video_id": captured_value
+    # }
+
+    # data = None
+    
+    # try:
+    #     # Sending POST request with JSON body
+    #     response = requests.post(url, headers=headers, json=jdata)
+
+    #     # Check response status code
+    #     if response.status_code == 200:
+    #         print("Success:", response.json())  # or response.text for raw response
+            
+    #         # str1 = str(response.json())
+    #         # data = json.loads(str1)["results"]
+            
+    #         data = response.json()["results"]
+                        
+    #     else:
+    #         print(f"Failed with status code {response.status_code}: {response.text}")
+
+    # except requests.exceptions.RequestException as e:
+    #     print("An error occurred:", e)    
+        
+        
+    # if data is None:
+    #     return pd.DataFrame(columns=["Time", "Chapter Title", "Link"])  # Placeholder DataFrame
+        
+    
+    
+    #DUMMY DATA
     response = """
     {
         "results": [
@@ -68,9 +114,11 @@ def generate_chapters(video_url):
         ]
     }
     """
-    
-    
     data = json.loads(response)["results"]
+    
+    
+    
+    
     df = pd.DataFrame(data)
     df.rename(columns={"start_time": "Start Time", "end_time": "End Time", "prediction": "Chapter Title"}, inplace=True)
     df["Time"] = df["Start Time"].astype(str) + " - " + df["End Time"].astype(str)
@@ -81,15 +129,28 @@ def generate_chapters(video_url):
 if st.button("Generate Chapter List"):
     if validators.url(video_url) and "youtube.com/watch" in video_url:
         ss.video_url = video_url
-        ss.df = generate_chapters(video_url)
-        st.success("Chapters generated successfully!")
+        
+        with st.spinner("Processing... Please wait!"):
+            ss.df = generate_chapters(video_url)
+            
+        if(ss.df.empty):
+            st.error("Error in generating chapters. Please try again later.")
+            ss.is_error = 1
+            
+        else:
+            ss.is_error = 0
+            st.success("Chapters generated successfully!")
+            
     else:
         st.error("Please enter a valid YouTube video URL.")
 
 # --- Display Chapters Table ---
 st.write("### Generated Chapters")
 if ss.df.empty:
-    st.warning("No chapters generated yet. Please provide a valid video URL and click 'Generate Chapter List'.")
+    if ss.is_error == 1:
+        st.error("Error in generating chapters. Please try again later.")
+    else:
+        st.warning("No chapters generated yet. Please provide a valid video URL and click 'Generate Chapter List'.")
 else:
     render_table_headers(list(ss.df.columns))
     for index, row in ss.df.iterrows():
